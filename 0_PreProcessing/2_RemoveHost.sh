@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # -----------------------------Name of the job-------------------------
 #SBATCH --job-name="Map-removeHost"
 #-----------------------------Output files-----------------------------
@@ -11,7 +12,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8  # Adjust this based on your system's configuration
-#SBATCH --mem-per-cpu=16GB  # Adjust this based on your memory requirements
+#SBATCH --mem-per-cpu=16G  # Adjust this based on your memory requirements
 #SBATCH --array=1-17
 i=$SLURM_ARRAY_TASK_ID
 
@@ -51,3 +52,5 @@ samtools fastq -f 1 -F 4 -F 256 -@ 8 $myBamPath/$IDout"_all_sort.bam" \
   -1 $myDataTrim/$ID"_CE_R1.fastq.gz" \
   -2 $myDataTrim/$ID"_CE_R2.fastq.gz" \
   -0 /dev/null -s $myDataTrim/$ID"_CE_S.fastq.gz" -n
+  
+rm $myBamPath/$IDout"_all.bam" $myBamPath/$IDout"_all_sort.bam"

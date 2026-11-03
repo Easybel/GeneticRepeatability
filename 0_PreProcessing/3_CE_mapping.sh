@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # -----------------------------Name of the job-------------------------
 #SBATCH --job-name=Map-onlyCE
 #-----------------------------Output files-----------------------------
@@ -11,7 +12,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8  # Adjust this based on your system's configuration
-#SBATCH --mem-per-cpu=16GB  # Adjust this based on your memory requirements
+#SBATCH --mem-per-cpu=16G  # Adjust this based on your memory requirements
 #SBATCH --array=1-47%15   #adjust to amount samples!  
 
 i=$SLURM_ARRAY_TASK_ID
@@ -33,14 +34,20 @@ IDout=$ID"_2CE"
 #already done! (with bwa index)
 
 # Mapping with BWA - and convert to bam to save space
-bwa mem -t $SLURM_CPUS_PER_TASK -M $myIdxPath/$ref_index".fasta" $myDataTrim/$ID"_R1.fastq.gz" $myDataTrim/$ID"_R2.fastq.gz" |\
- samtools view --threads 1 -bS - -o $myBamPath/$IDout".bam"
+## add read group tags to that the reads can be associated correctly by name in downstream analysis (such as bcftools, GATK, ..)
+ 
+bwa mem -t $SLURM_CPUS_PER_TASK -M \
+-R "@RG\tID:${IDout}\tSM:${IDout}\tPL:ILLUMINA\tLB:${IDout}" \
+$myIdxPath/$ref_index".fasta" $myDataTrim/$ID"_R1.fastq.gz" $myDataTrim/$ID"_R2.fastq.gz" |\
+samtools view --threads 1 -bS - -o $myBamPath/$IDout".bam"
+    
+    
 
 #sort bam files based on coordinates 
 samtools sort $myBamPath/$IDout".bam" -o $myBamPath/$IDout"_sort.bam"
 
 #remove duplicate reads with Picard https://gatk.broadinstitute.org/hc/en-us/articles/360037052812-MarkDuplicates-Picard 
-/zfs/omics/software/bin/picard MarkDuplicates -I $myBamPath/$IDout"_sort.bam" -M $myBamPath/$IDout"_marked_dup_metics" -O $myBamPath/$IDout"_sort_woDup.bam" --REMOVE_DUPLICATES
+/zfs/omics/software/bin/picard MarkDuplicates -I $myBamPath/$IDout"_sort.bam" -M $myBamPath/$IDout"_marked_dup_metrics" -O $myBamPath/$IDout"_sort_woDup.bam" --REMOVE_DUPLICATES
 # -I input file SAM, BAM or CRAN. must be coordinate sorted !
 # -M file to write duplication metrics
 # -O output file to write the marked records
@@ -67,6 +74,11 @@ samtools index $myBamPath/$IDout"_sort_woDup_filt.bam"
 # -a = sorted bam file   
 samtools depth -a $myBamPath/$IDout"_sort_woDup_filt.bam" > $myBamPath/$IDout"_cov.txt"
 
+## clean up the bams: 
+rm $myBamPath/$IDout".bam" \
+     $myBamPath/$IDout"_sort.bam" \
+     $myBamPath/$IDout"_sort_woDup.bam"
+     
 ## copy the created data to the final destination
 cp $myBamPath/$IDout"_sort_woDup_filt"* /zfs/omics/projects/cevolution/1_CnemEvol/3_CE_mapped/bam/new
 cp $myBamPath/$IDout"_cov.txt" /zfs/omics/projects/cevolution/1_CnemEvol/3_CE_mapped/bam/new

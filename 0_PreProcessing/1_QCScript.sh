@@ -1,9 +1,7 @@
 #!/bin/bash
+set -euo pipefail
 # -----------------------------Name of the job-------------------------
 #SBATCH --job-name=GC_content
-#-----------------------------Mail address-----------------------------
-#SBATCH --mail-user=emma.diepeveen@hotmail.com
-#SBATCH --mail-type=ALL
 #-----------------------------Output files-----------------------------
 #SBATCH --output=logs_slurm/output_%j.txt
 #SBATCH --error=logs_slurm/error_output_%j.txt
@@ -15,7 +13,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8  # Adjust this based on your system's configuration
 #SBATCH --mem-per-cpu=16G  # Adjust this based on your memory requirements
-#SBATCH --array=1 
+#SBATCH --array=1-10
 i=$SLURM_ARRAY_TASK_ID
 
 
@@ -37,8 +35,7 @@ ID=$(ls -1 $myDataRaw | grep "R" | grep "1_1.fastq.gz" | sed -n ''$i'p'| cut -d"
 fastqc -o $myQCRaw/ $myDataRaw/$ID"1_001.fastq.gz" -t 8
 fastqc -o $myQCRaw/ $myDataRaw/$ID"2_001.fastq.gz" -t 8
 
-cd $TrimmFold
-java -Xmx30G -Xms24G -jar trimmomatic-0.39.jar PE -threads 8 -trimlog $myDataRaw/$ID.TrimLog $myDataRaw/$ID"1_001.fastq.gz" $myDataRaw/$ID"2_001.fastq.gz" $myDataTrim/$ID"_1P".fastq.gz $myDataTrim/$ID"_1U".fastq.gz $myDataTrim/$ID"_2P".fastq.gz $myDataTrim/$ID"_2U".fastq.gz ILLUMINACLIP:$TrimmFold/adapters/TruSeq3-PE-2.fa:2:30:10:4 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36
+java -Xmx30G -jar $TrimmFold/trimmomatic-0.39.jar PE -threads 8 -trimlog $myDataRaw/$ID.TrimLog $myDataRaw/$ID"1_001.fastq.gz" $myDataRaw/$ID"2_001.fastq.gz" $myDataTrim/$ID"_1P".fastq.gz $myDataTrim/$ID"_1U".fastq.gz $myDataTrim/$ID"_2P".fastq.gz $myDataTrim/$ID"_2U".fastq.gz ILLUMINACLIP:$TrimmFold/adapters/TruSeq3-PE-2.fa:2:30:10:4 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36
 
 # Perform FastQC quality control again on trimmed data.
 fastqc -o $myQCTrim $myDataTrim/$ID"_1P.fastq.gz" -t 8
