@@ -1,5 +1,4 @@
 #!/bin/bash
-set -euo pipefail
 # -----------------------------Name of the job-------------------------
 #SBATCH --job-name=GC_content
 #-----------------------------Output files-----------------------------
@@ -14,6 +13,8 @@ set -euo pipefail
 #SBATCH --cpus-per-task=8  # Adjust this based on your system's configuration
 #SBATCH --mem-per-cpu=16G  # Adjust this based on your memory requirements
 #SBATCH --array=1-10
+set -euo pipefail
+
 i=$SLURM_ARRAY_TASK_ID
 
 

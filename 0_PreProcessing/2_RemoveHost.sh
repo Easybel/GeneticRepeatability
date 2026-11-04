@@ -1,5 +1,4 @@
 #!/bin/bash
-set -euo pipefail
 # -----------------------------Name of the job-------------------------
 #SBATCH --job-name="Map-removeHost"
 #-----------------------------Output files-----------------------------
@@ -14,6 +13,8 @@ set -euo pipefail
 #SBATCH --cpus-per-task=8  # Adjust this based on your system's configuration
 #SBATCH --mem-per-cpu=16G  # Adjust this based on your memory requirements
 #SBATCH --array=1-17
+set -euo pipefail
+
 i=$SLURM_ARRAY_TASK_ID
 
 #Define input and output paths.
@@ -35,20 +36,24 @@ bwa mem -t $SLURM_CPUS_PER_TASK $myIdxPath/$ref_index".fasta" $myDataTrim/$ID"_1
 # sort the reads according to names
 samtools sort -n $myBamPath/$IDout"_all.bam" -o $myBamPath/$IDout"_all_sort.bam"
 
-####
+#### filter for NON-HOST reads
 ##### Get the unmapped reads and separate them in fastq files
 # split the reads into separate files .._R1 ..R2 & singletons
-samtools fastq -f 4 -F 256 -@ 8 $myBamPath/$IDout"_all_sort.bam" \
-  -1 $myDataTrim/$ID"_CE_removed_R1.fastq.gz" \
-  -2 $myDataTrim/$ID"_CE_removed_R2.fastq.gz" \
-  -0 /dev/null -s $myDataTrim/$ID"_CE_removed_S.fastq.gz" -n
+# -f 12 = KEEP: read unmapped (4) AND mate unmapped (8)
+# -F 256 = exclude all none-primary alignments
+samtools fastq -f 12 -F 256 -@ 8 $myBamPath/$IDout"_all_sort.bam" \
+  -1 $myDataTrim/$ID"_CEremoved_R1.fastq.gz" \
+  -2 $myDataTrim/$ID"_CEremoved_R2.fastq.gz" \
+  -0 /dev/null -s $myDataTrim/$ID"_CEremoved_S.fastq.gz" -n
 
 
 ####
 ##### Get the mapped reads and separate them in fastq files
 
-# exclude all unmapped and none-primary alignments
-samtools fastq -f 1 -F 4 -F 256 -@ 8 $myBamPath/$IDout"_all_sort.bam" \
+# filter for HOST reads
+# -f 2 = KEEP: read is properly paired (both mates mapped, correct orientation)
+# -F 256 = exclude all none-primary alignments
+samtools fastq -f 2 -F 256 -@ 8 $myBamPath/$IDout"_all_sort.bam" \
   -1 $myDataTrim/$ID"_CE_R1.fastq.gz" \
   -2 $myDataTrim/$ID"_CE_R2.fastq.gz" \
   -0 /dev/null -s $myDataTrim/$ID"_CE_S.fastq.gz" -n
