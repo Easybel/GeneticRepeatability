@@ -14,59 +14,43 @@ import matplotlib.patches as mpatches
 from matplotlib.patches import Ellipse
 from scipy.stats import chi2
 
+import sys
+sys.path.append("/home/isabel/Documents/postDoc_Amsterdam/B_BioInfo/1_MyScripts/GitHub/GeneticRepeatability/")
+from plot_config import colors_labNames, colors_treats, markers_weeks
+
 # =============================================================================
 # SETTINGS — edit these to change the plot
 # =============================================================================
 
-CSV_FILE   = "O_output/CnemAll_wo13Samples_coordinates_poolfstat_5Nov26.csv"
-OUT_PREFIX = "O_output/PCA_CnemAll_wo13Samples"  # output base name (no extension)
-OUT_FORMAT = "pdf"                                # "pdf" or "png"
+basePath = "/home/isabel/Documents/postDoc_Amsterdam/1_EvolWormJourney/1_Genomics/2_EvolGenomics/1_Dev_PipelineCelegans/2_PCA_AllSamples/"
+CSV_FILE   = basePath + "O_output_rawR/CnemAll_wo23Samples_coordinates_poolfstat_5Nov26.csv"
+OUT_PREFIX = basePath + "O_plots/PCA_CnemAll_wo23Samples"  # output base name (no extension)
+OUT_FORMAT = "svg"                                # "pdf" or "png"
 
 # Which PCs to put on the axes
 X_PC = "PC1"
 Y_PC = "PC2"
 
+X_PC_perc = "7"
+Y_PC_perc = "6"
+
 # Column used for colouring and ellipses
 # Options: "lab", "treatment", "week", "gen_label", "lab_treat"
-GROUP_BY = "lab"
+GROUP_BY = "treatment"
 
 # Confidence level for the ellipses
 CONF_LEVEL = 0.95
 
 # Show the pool name next to each point?
-LABEL_POINTS = False
+LABEL_POINTS = True
 
 # Point size and transparency
-POINT_SIZE  = 60
-POINT_ALPHA = 0.85
+POINT_SIZE  = 90
+POINT_ALPHA = 0.5
 
-# Colour palette — one colour per group value
-# Add or change colours freely; unknown groups fall back to grey
-PALETTE = {
-    # Labs
-    "Gent": "#E63946",
-    "UVA":  "#457B9D",
-    "VU":   "#2A9D8F",
-    "NIOO": "#E9C46A",
-    "RUG":  "#F4A261",
-    "WUR":  "#6A4C93",
-    # Treatments (used when GROUP_BY = "treatment")
-    "bb":     "#E63946",
-    "anc":    "#457B9D",
-    "iso":    "#2A9D8F",
-    "A00":    "#E9C46A",
-    "M00":    "#F4A261",
-    "bn50":   "#6A4C93",
-    "bn5":    "#264653",
-    "bleach": "#A8DADC",
-    # Weeks / gen_label (used when GROUP_BY = "week" or "gen_label")
-    0:        "#E9C46A",
-    1:        "#E63946",
-    15:       "#264653",
-    "week0":  "#E9C46A",
-    "week1":  "#E63946",
-    "week15": "#264653",
-}
+# Pick palette to match GROUP_BY
+COLOR_PALETTE = colors_labNames if GROUP_BY == "lab" else colors_treats
+
 
 # =============================================================================
 # FUNCTIONS
@@ -115,47 +99,58 @@ assert Y_PC in df.columns, f"Column '{Y_PC}' not found in CSV"
 assert GROUP_BY in df.columns, f"Column '{GROUP_BY}' not found in CSV"
 
 # --- 2. Plot -----------------------------------------------------------------
-groups = sorted(df[GROUP_BY].unique(), key=str)
+#groups = sorted(df[GROUP_BY].unique(), key=str)
 fig, ax = plt.subplots(figsize=(8, 7))
 legend_handles = []
 
-for group in groups:
-    subset = df[df[GROUP_BY] == group]
-    color  = PALETTE.get(group, "#888888")  # grey if group not in palette
+for (c, week), subset in df.groupby([GROUP_BY, "week"]):
+    color  = COLOR_PALETTE.get(c,   "#888888")
+    marker = markers_weeks.get(week,  "o")        # fallback to circle
 
-    # Scatter points
     ax.scatter(
         subset[X_PC], subset[Y_PC],
-        color=color, s=POINT_SIZE, alpha=POINT_ALPHA,
+        color=color, marker=marker,
+        s=POINT_SIZE, alpha=POINT_ALPHA,
+         edgecolors="black", linewidths=0.5,
         zorder=3
     )
 
     # Optional point labels
-    if LABEL_POINTS:
-        for _, row in subset.iterrows():
-            ax.text(row[X_PC], row[Y_PC], row["pool"],
-                    fontsize=5, ha="left", va="bottom", color=color)
+    if (c == "bn5"):## | (c == "bn50"):
+        if LABEL_POINTS:
+            for _, row in subset.iterrows():
+                ax.text(row[X_PC] + row[X_PC]*0.04, row[Y_PC] + row[Y_PC]*0.01, row["replicate"],
+                        fontsize=14, ha="left", va="bottom", color=color)
 
-    # 95% confidence ellipse
-    confidence_ellipse(
-        subset[X_PC].values, subset[Y_PC].values, ax,
-        conf=CONF_LEVEL,
-        edgecolor=color, facecolor=color,
-        alpha=0.15, linewidth=1.5, zorder=2
-    )
-
-    legend_handles.append(mpatches.Patch(color=color, label=str(group)))
+# 95% confidence ellipse
+for c, subset in df.groupby(GROUP_BY):
+    if c != "bn5":
+        color = COLOR_PALETTE.get(c, "#888888")   # ← add this
+        confidence_ellipse(
+            subset[X_PC].values, subset[Y_PC].values, ax,
+            conf=CONF_LEVEL,
+            edgecolor=color, facecolor="none",
+            alpha=0.9, linewidth=2, zorder=4
+        )
 
 # Axes and labels
-ax.set_xlabel(X_PC, fontsize=13)
-ax.set_ylabel(Y_PC, fontsize=13)
-ax.set_title(f"PCA — coloured by {GROUP_BY}", fontsize=14)
+ax.set_xlabel(X_PC + ' (' + X_PC_perc + '%)', fontsize=13)
+ax.set_ylabel(Y_PC + ' (' + Y_PC_perc + '%)', fontsize=13)
 ax.axhline(0, color="grey", linewidth=0.5, linestyle="--")
 ax.axvline(0, color="grey", linewidth=0.5, linestyle="--")
-ax.legend(
-    handles=legend_handles, title=GROUP_BY,
-    bbox_to_anchor=(1.02, 1), loc="upper left", frameon=False
-)
+# Two separate legends: one for lab colours, one for treatment markers
+lab_handles = [mpatches.Patch(color=COLOR_PALETTE.get(c, "#888888"), label=c)
+               for c in df[GROUP_BY].unique()]
+treat_handles = [plt.Line2D([0], [0], marker=markers_weeks.get(t, "o"),
+                             color="grey", linestyle="None",
+                             markersize=7, label=t)
+                 for t in sorted(df["week"].unique())]   # ← sorted()
+
+leg1 = ax.legend(handles=lab_handles,   title=GROUP_BY,
+                 bbox_to_anchor=(1.02, 1),    loc="upper left", frameon=False)
+leg2 = ax.legend(handles=treat_handles, title="week",
+                 bbox_to_anchor=(1.02, 0.4),  loc="upper left", frameon=False)
+ax.add_artist(leg1)  # needed because the second legend() call replaces the first
 
 plt.tight_layout()
 
